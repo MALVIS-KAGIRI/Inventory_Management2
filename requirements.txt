@@ -1,0 +1,9 @@
+Flask==2.3.3
+Flask-SQLAlchemy==3.1.1
+Flask-Login==0.6.2
+Flask-WTF==1.1.1
+Flask-Bcrypt==1.0.1
+email_validator==2.1.2
+Werkzeug==2.3.7
+pyodbc==5.0.1
+sqlalchemy-pytds==0.3.5
