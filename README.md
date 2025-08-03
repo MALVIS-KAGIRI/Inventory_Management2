@@ -67,7 +67,6 @@ This project uses:
 
 ## Security Notes
 
-- This application uses SQLite for data storage
+- This application uses Microsoft Sql Server for data storage
 - Passwords are hashed using bcrypt before storage
-- For production, consider using a more robust database like PostgreSQL
 - Set a strong SECRET_KEY in environment variables for production use
