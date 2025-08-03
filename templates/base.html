@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% if title %}{{ title }} - {% endif %}Inventory Management System</title>
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Custom CSS -->
+    <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
+</head>
+<body>
+    {% if current_user.is_authenticated %}
+    <nav class="navbar navbar-expand-lg navbar-dark">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="{{ url_for('dashboard') }}">
+                <i class="fas fa-boxes me-2"></i>
+                Inventory Pro
+            </a>
+            
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.endpoint == 'dashboard' %}active{% endif %}" href="{{ url_for('dashboard') }}">
+                            <i class="fas fa-tachometer-alt me-1"></i>
+                            Dashboard
+                        </a>
+                    </li>
+                    
+                    {% if has_permission('inventory.view') %}
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle {% if 'inventory' in request.endpoint %}active{% endif %}" href="#" role="button" data-bs-toggle="dropdown">
+                            <i class="fas fa-boxes me-1"></i>
+                            Inventory
+                        </a>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="{{ url_for('inventory') }}">
+                                <i class="fas fa-list me-2"></i>Products
+                            </a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('categories') }}">
+                                <i class="fas fa-tags me-2"></i>Categories
+                            </a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('suppliers') }}">
+                                <i class="fas fa-truck me-2"></i>Suppliers
+                            </a></li>
+                        </ul>
+                    </li>
+                    {% endif %}
+                    
+                    {% if has_permission('customers.view') %}
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.endpoint == 'customers' %}active{% endif %}" href="{{ url_for('customers') }}">
+                            <i class="fas fa-users me-1"></i>
+                            Customers
+                        </a>
+                    </li>
+                    {% endif %}
+                    
+                    {% if has_permission('operations.basic') %}
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle {% if 'operations' in request.endpoint %}active{% endif %}" href="#" role="button" data-bs-toggle="dropdown">
+                            <i class="fas fa-cogs me-1"></i>
+                            Operations
+                        </a>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="{{ url_for('operations') }}">
+                                <i class="fas fa-shopping-cart me-2"></i>Orders
+                            </a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('stock_adjustment') }}">
+                                <i class="fas fa-exchange-alt me-2"></i>Stock Adjustment
+                            </a></li>
+                        </ul>
+                    </li>
+                    {% endif %}
+                    
+                    {% if has_permission('users.view') %}
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.endpoint == 'users' %}active{% endif %}" href="{{ url_for('users') }}">
+                            <i class="fas fa-user-cog me-1"></i>
+                            Users
+                        </a>
+                    </li>
+                    {% endif %}
+                    
+                    {% if has_permission('roles.manage') %}
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.endpoint == 'roles' %}active{% endif %}" href="{{ url_for('roles') }}">
+                            <i class="fas fa-shield-alt me-1"></i>
+                            Roles
+                        </a>
+                    </li>
+                    {% endif %}
+                </ul>
+                
+                <ul class="navbar-nav">
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                            <i class="fas fa-user-circle me-1"></i>
+                            {{ current_user.username }}
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><a class="dropdown-item" href="#">
+                                <i class="fas fa-user me-2"></i>Profile
+                            </a></li>
+                            <li><a class="dropdown-item" href="#">
+                                <i class="fas fa-cog me-2"></i>Settings
+                            </a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="{{ url_for('logout') }}">
+                                <i class="fas fa-sign-out-alt me-2"></i>Logout
+                            </a></li>
+                        </ul>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+    {% endif %}
+
+    <main class="{% if current_user.is_authenticated %}container-fluid mt-4{% endif %}">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="row">
+                    <div class="col-12">
+                        {% for category, message in messages %}
+                            <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show slide-up" role="alert">
+                                <i class="fas fa-{% if category == 'success' %}check-circle{% elif category == 'danger' or category == 'error' %}exclamation-triangle{% elif category == 'warning' %}exclamation-circle{% else %}info-circle{% endif %} me-2"></i>
+                                {{ message }}
+                                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                            </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            {% endif %}
+        {% endwith %}
+
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- Custom JavaScript -->
+    <script>
+        // Auto-hide alerts after 5 seconds
+        setTimeout(function() {
+            const alerts = document.querySelectorAll('.alert');
+            alerts.forEach(function(alert) {
+                const bsAlert = new bootstrap.Alert(alert);
+                bsAlert.close();
+            });
+        }, 5000);
+
+        // Add loading spinner to buttons on form submit
+        document.addEventListener('DOMContentLoaded', function() {
+            const forms = document.querySelectorAll('form');
+            forms.forEach(function(form) {
+                form.addEventListener('submit', function() {
+                    const submitBtn = form.querySelector('button[type="submit"]');
+                    if (submitBtn) {
+                        submitBtn.innerHTML = '<span class="spinner me-2"></span>Processing...';
+                        submitBtn.disabled = true;
+                    }
+                });
+            });
+        });
+
+        // Confirm delete actions
+        function confirmDelete(message) {
+            return confirm(message || 'Are you sure you want to delete this item?');
+        }
+    </script>
+    
+    {% block scripts %}{% endblock %}
+</body>
+</html>

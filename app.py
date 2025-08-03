@@ -1,8 +1,5 @@
 from flask import Flask, render_template, redirect, url_for, flash, request, abort
 from flask_login import LoginManager, UserMixin, login_user, current_user, logout_user, login_required
-from flask_wtf import FlaskForm
-from wtforms import StringField, PasswordField, SubmitField, SelectField, BooleanField
-from wtforms.validators import DataRequired, Email, EqualTo, ValidationError
 from flask_bcrypt import Bcrypt
 from datetime import datetime
 import os
@@ -10,6 +7,11 @@ import urllib
 from dotenv import load_dotenv
 from config import Config
 from database import db, init_app
+from models import *
+from forms import *
+from sqlalchemy import func
+import random
+import string
 
 # Initialize Flask application
 app = Flask(__name__)
@@ -23,80 +25,9 @@ login_manager = LoginManager(app)
 login_manager.login_view = 'login'
 login_manager.login_message_category = 'info'
 
-# Models
-# Association table for many-to-many relationship between roles and permissions
-role_permissions = db.Table('role_permissions',
-    db.Column('role_id', db.Integer, db.ForeignKey('role.id'), primary_key=True),
-    db.Column('permission_id', db.Integer, db.ForeignKey('permission.id'), primary_key=True)
-)
-
-class Role(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(30), unique=True, nullable=False)
-    description = db.Column(db.String(200))
-    users = db.relationship('User', backref='role', lazy=True)
-    permissions = db.relationship('Permission', secondary=role_permissions, 
-                                  lazy='subquery', backref=db.backref('roles', lazy=True))
-
-class Permission(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100), unique=True, nullable=False)
-    description = db.Column(db.String(200))
-
-class User(db.Model, UserMixin):
-    id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(20), unique=True, nullable=False)
-    email = db.Column(db.String(120), unique=True, nullable=False)
-    password_hash = db.Column(db.String(60), nullable=False)
-    role_id = db.Column(db.Integer, db.ForeignKey('role.id'), nullable=False)
-    is_active = db.Column(db.Boolean, default=True, nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
-    last_login = db.Column(db.DateTime)
-
 @login_manager.user_loader
 def load_user(user_id):
     return User.query.get(int(user_id))
-
-# Forms
-class LoginForm(FlaskForm):
-    username = StringField('Username', validators=[DataRequired()])
-    password = PasswordField('Password', validators=[DataRequired()])
-    submit = SubmitField('Login')
-
-class RegistrationForm(FlaskForm):
-    username = StringField('Username', validators=[DataRequired()])
-    email = StringField('Email', validators=[DataRequired(), Email()])
-    password = PasswordField('Password', validators=[DataRequired()])
-    confirm_password = PasswordField('Confirm Password', validators=[DataRequired(), EqualTo('password')])
-    submit = SubmitField('Register')
-
-    def validate_username(self, username):
-        user = User.query.filter_by(username=username.data).first()
-        if user:
-            raise ValidationError('Username already taken.')
-
-    def validate_email(self, email):
-        user = User.query.filter_by(email=email.data).first()
-        if user:
-            raise ValidationError('Email already registered.')
-
-class UserForm(FlaskForm):
-    username = StringField('Username', validators=[DataRequired()])
-    email = StringField('Email', validators=[DataRequired(), Email()])
-    password = PasswordField('Password', validators=[DataRequired()])
-    role = SelectField('Role', coerce=int)
-    is_active = BooleanField('Active')
-    submit = SubmitField('Add User')
-
-    def validate_username(self, username):
-        user = User.query.filter_by(username=username.data).first()
-        if user:
-            raise ValidationError('Username already taken.')
-
-    def validate_email(self, email):
-        user = User.query.filter_by(email=email.data).first()
-        if user:
-            raise ValidationError('Email already registered.')
 
 # Routes
 @app.route('/')
@@ -135,7 +66,28 @@ def dashboard():
     # Check if user has permission to view dashboard
     if not has_permission('dashboard.view'):
         abort(403)
-    return render_template('dashboard.html', title='Dashboard', has_permission=has_permission)
+    
+    # Get dashboard statistics
+    total_products = Product.query.filter_by(is_active=True).count()
+    total_customers = Customer.query.filter_by(is_active=True).count()
+    total_orders = Order.query.count()
+    low_stock_products = Product.query.filter(Product.quantity_in_stock <= Product.reorder_level).count()
+    
+    # Recent orders
+    recent_orders = Order.query.order_by(Order.created_at.desc()).limit(5).all()
+    
+    # Low stock products
+    low_stock_items = Product.query.filter(Product.quantity_in_stock <= Product.reorder_level).limit(5).all()
+    
+    return render_template('dashboard.html', 
+                         title='Dashboard', 
+                         has_permission=has_permission,
+                         total_products=total_products,
+                         total_customers=total_customers,
+                         total_orders=total_orders,
+                         low_stock_products=low_stock_products,
+                         recent_orders=recent_orders,
+                         low_stock_items=low_stock_items)
 
 @app.route('/inventory')
 @login_required
@@ -143,7 +95,107 @@ def inventory():
     # Check if user has permission to view inventory
     if not has_permission('inventory.view'):
         abort(403)
-    return render_template('inventory.html', title='Inventory Management', has_permission=has_permission)
+    
+    products = Product.query.filter_by(is_active=True).all()
+    categories = Category.query.all()
+    suppliers = Supplier.query.filter_by(is_active=True).all()
+    
+    return render_template('inventory.html', 
+                         title='Inventory Management', 
+                         has_permission=has_permission,
+                         products=products,
+                         categories=categories,
+                         suppliers=suppliers)
+
+@app.route('/inventory/products/add', methods=['GET', 'POST'])
+@login_required
+def add_product():
+    if not has_permission('inventory.edit'):
+        abort(403)
+    
+    form = ProductForm()
+    form.category.choices = [(c.id, c.name) for c in Category.query.all()]
+    form.supplier.choices = [(0, 'Select Supplier')] + [(s.id, s.name) for s in Supplier.query.filter_by(is_active=True).all()]
+    
+    if form.validate_on_submit():
+        product = Product(
+            name=form.name.data,
+            description=form.description.data,
+            sku=form.sku.data,
+            category_id=form.category.data,
+            supplier_id=form.supplier.data if form.supplier.data != 0 else None,
+            price=form.price.data,
+            cost=form.cost.data,
+            quantity_in_stock=form.quantity_in_stock.data,
+            reorder_level=form.reorder_level.data,
+            is_active=form.is_active.data
+        )
+        db.session.add(product)
+        db.session.commit()
+        flash('Product added successfully!', 'success')
+        return redirect(url_for('inventory'))
+    
+    return render_template('add_product.html', title='Add Product', form=form, has_permission=has_permission)
+
+@app.route('/inventory/categories')
+@login_required
+def categories():
+    if not has_permission('inventory.view'):
+        abort(403)
+    
+    categories_list = Category.query.all()
+    return render_template('categories.html', title='Categories', categories=categories_list, has_permission=has_permission)
+
+@app.route('/inventory/categories/add', methods=['GET', 'POST'])
+@login_required
+def add_category():
+    if not has_permission('inventory.edit'):
+        abort(403)
+    
+    form = CategoryForm()
+    if form.validate_on_submit():
+        category = Category(
+            name=form.name.data,
+            description=form.description.data
+        )
+        db.session.add(category)
+        db.session.commit()
+        flash('Category added successfully!', 'success')
+        return redirect(url_for('categories'))
+    
+    return render_template('add_category.html', title='Add Category', form=form, has_permission=has_permission)
+
+@app.route('/inventory/suppliers')
+@login_required
+def suppliers():
+    if not has_permission('inventory.view'):
+        abort(403)
+    
+    suppliers_list = Supplier.query.all()
+    return render_template('suppliers.html', title='Suppliers', suppliers=suppliers_list, has_permission=has_permission)
+
+@app.route('/inventory/suppliers/add', methods=['GET', 'POST'])
+@login_required
+def add_supplier():
+    if not has_permission('inventory.edit'):
+        abort(403)
+    
+    form = SupplierForm()
+    if form.validate_on_submit():
+        supplier = Supplier(
+            name=form.name.data,
+            contact_person=form.contact_person.data,
+            email=form.email.data,
+            phone=form.phone.data,
+            address=form.address.data,
+            is_active=form.is_active.data
+        )
+        db.session.add(supplier)
+        db.session.commit()
+        flash('Supplier added successfully!', 'success')
+        return redirect(url_for('suppliers'))
+    
+    return render_template('add_supplier.html', title='Add Supplier', form=form, has_permission=has_permission)
 
 @app.route('/customers')
 @login_required
@@ -151,7 +203,36 @@ def customers():
     # Check if user has permission to view customers
     if not has_permission('customers.view'):
         abort(403)
-    return render_template('customers.html', title='Customer Management', has_permission=has_permission)
+    
+    customers_list = Customer.query.filter_by(is_active=True).all()
+    return render_template('customers.html', title='Customer Management', customers=customers_list, has_permission=has_permission)
+
+@app.route('/customers/add', methods=['GET', 'POST'])
+@login_required
+def add_customer():
+    if not has_permission('customers.edit'):
+        abort(403)
+    
+    form = CustomerForm()
+    if form.validate_on_submit():
+        customer = Customer(
+            first_name=form.first_name.data,
+            last_name=form.last_name.data,
+            email=form.email.data,
+            phone=form.phone.data,
+            address=form.address.data,
+            city=form.city.data,
+            state=form.state.data,
+            zip_code=form.zip_code.data,
+            customer_type=form.customer_type.data,
+            is_active=form.is_active.data
+        )
+        db.session.add(customer)
+        db.session.commit()
+        flash('Customer added successfully!', 'success')
+        return redirect(url_for('customers'))
+    
+    return render_template('add_customer.html', title='Add Customer', form=form, has_permission=has_permission)
 
 @app.route('/operations')
 @login_required
@@ -159,7 +240,73 @@ def operations():
     # Check if user has permission to perform basic operations
     if not has_permission('operations.basic'):
         abort(403)
-    return render_template('operations.html', title='Basic Operations', has_permission=has_permission)
+    
+    orders = Order.query.order_by(Order.created_at.desc()).all()
+    return render_template('operations.html', title='Basic Operations', orders=orders, has_permission=has_permission)
+
+@app.route('/operations/orders/add', methods=['GET', 'POST'])
+@login_required
+def add_order():
+    if not has_permission('operations.basic'):
+        abort(403)
+    
+    form = OrderForm()
+    form.customer.choices = [(c.id, c.full_name) for c in Customer.query.filter_by(is_active=True).all()]
+    
+    if form.validate_on_submit():
+        # Generate order number
+        order_number = 'ORD' + ''.join(random.choices(string.digits, k=6))
+        
+        order = Order(
+            order_number=order_number,
+            customer_id=form.customer.data,
+            status=form.status.data,
+            notes=form.notes.data,
+            created_by=current_user.id
+        )
+        db.session.add(order)
+        db.session.commit()
+        flash('Order created successfully!', 'success')
+        return redirect(url_for('operations'))
+    
+    return render_template('add_order.html', title='Add Order', form=form, has_permission=has_permission)
+
+@app.route('/operations/stock-adjustment', methods=['GET', 'POST'])
+@login_required
+def stock_adjustment():
+    if not has_permission('operations.basic'):
+        abort(403)
+    
+    form = StockAdjustmentForm()
+    form.product.choices = [(p.id, f"{p.name} (Current: {p.quantity_in_stock})") for p in Product.query.filter_by(is_active=True).all()]
+    
+    if form.validate_on_submit():
+        product = Product.query.get(form.product.data)
+        
+        # Create stock movement record
+        movement = StockMovement(
+            product_id=form.product.data,
+            movement_type=form.movement_type.data,
+            quantity=form.quantity.data,
+            reference_type='ADJUSTMENT',
+            notes=form.notes.data,
+            created_by=current_user.id
+        )
+        
+        # Update product stock
+        if form.movement_type.data == 'IN':
+            product.quantity_in_stock += form.quantity.data
+        elif form.movement_type.data == 'OUT':
+            product.quantity_in_stock = max(0, product.quantity_in_stock - form.quantity.data)
+        else:  # ADJUSTMENT
+            product.quantity_in_stock = form.quantity.data
+        
+        db.session.add(movement)
+        db.session.commit()
+        flash('Stock adjustment processed successfully!', 'success')
+        return redirect(url_for('operations'))
+    
+    return render_template('stock_adjustment.html', title='Stock Adjustment', form=form, has_permission=has_permission)
 
 @app.route('/users')
 @login_required
@@ -349,6 +496,23 @@ def init_db():
         if not permission:
             permission = Permission(name=name, description=description)
             db.session.add(permission)
+    
+    db.session.commit()
+    
+    # Create default categories
+    default_categories = [
+        ('Electronics', 'Electronic devices and components'),
+        ('Clothing', 'Apparel and accessories'),
+        ('Books', 'Books and publications'),
+        ('Home & Garden', 'Home improvement and gardening supplies'),
+        ('Sports', 'Sports equipment and accessories')
+    ]
+    
+    for name, description in default_categories:
+        category = Category.query.filter_by(name=name).first()
+        if not category:
+            category = Category(name=name, description=description)
+            db.session.add(category)
     
     db.session.commit()
     

@@ -1,0 +1,227 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="fade-in">
+    <div class="row mb-4">
+        <div class="col-12">
+            <h1 class="text-gradient mb-3">
+                <i class="fas fa-tachometer-alt me-2"></i>
+                Dashboard Overview
+            </h1>
+            <p class="text-muted">Welcome back, {{ current_user.username }}! Here's what's happening in your inventory.</p>
+        </div>
+    </div>
+
+    <!-- Statistics Cards -->
+    <div class="row mb-4">
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="stats-card">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="stats-number">{{ total_products }}</div>
+                        <div class="stats-label">Total Products</div>
+                    </div>
+                    <div class="fs-1 opacity-75">
+                        <i class="fas fa-boxes"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="stats-card success">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="stats-number">{{ total_customers }}</div>
+                        <div class="stats-label">Total Customers</div>
+                    </div>
+                    <div class="fs-1 opacity-75">
+                        <i class="fas fa-users"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="stats-card info">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="stats-number">{{ total_orders }}</div>
+                        <div class="stats-label">Total Orders</div>
+                    </div>
+                    <div class="fs-1 opacity-75">
+                        <i class="fas fa-shopping-cart"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="stats-card {% if low_stock_products > 0 %}warning{% else %}success{% endif %}">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="stats-number">{{ low_stock_products }}</div>
+                        <div class="stats-label">Low Stock Items</div>
+                    </div>
+                    <div class="fs-1 opacity-75">
+                        <i class="fas fa-exclamation-triangle"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Recent Orders -->
+        <div class="col-lg-8 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <i class="fas fa-shopping-cart me-2"></i>
+                    Recent Orders
+                </div>
+                <div class="card-body">
+                    {% if recent_orders %}
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Order #</th>
+                                        <th>Customer</th>
+                                        <th>Status</th>
+                                        <th>Total</th>
+                                        <th>Date</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for order in recent_orders %}
+                                    <tr>
+                                        <td><strong>{{ order.order_number }}</strong></td>
+                                        <td>{{ order.customer.full_name }}</td>
+                                        <td>
+                                            <span class="badge bg-{% if order.status == 'Delivered' %}success{% elif order.status == 'Cancelled' %}danger{% elif order.status == 'Processing' %}warning{% else %}primary{% endif %}">
+                                                {{ order.status }}
+                                            </span>
+                                        </td>
+                                        <td>${{ "%.2f"|format(order.total_amount) }}</td>
+                                        <td>{{ order.created_at.strftime('%m/%d/%Y') }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        {% if has_permission('operations.basic') %}
+                        <div class="text-center mt-3">
+                            <a href="{{ url_for('operations') }}" class="btn btn-outline-primary">
+                                <i class="fas fa-eye me-1"></i>
+                                View All Orders
+                            </a>
+                        </div>
+                        {% endif %}
+                    {% else %}
+                        <div class="text-center py-4">
+                            <i class="fas fa-shopping-cart fa-3x text-muted mb-3"></i>
+                            <p class="text-muted">No orders found</p>
+                            {% if has_permission('operations.basic') %}
+                            <a href="{{ url_for('add_order') }}" class="btn btn-primary">
+                                <i class="fas fa-plus me-1"></i>
+                                Create First Order
+                            </a>
+                            {% endif %}
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Low Stock Alert -->
+        <div class="col-lg-4 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    Low Stock Alert
+                </div>
+                <div class="card-body">
+                    {% if low_stock_items %}
+                        {% for product in low_stock_items %}
+                        <div class="d-flex justify-content-between align-items-center mb-3 p-2 bg-light rounded">
+                            <div>
+                                <strong>{{ product.name }}</strong>
+                                <br>
+                                <small class="text-muted">SKU: {{ product.sku }}</small>
+                            </div>
+                            <div class="text-end">
+                                <span class="badge bg-warning">{{ product.quantity_in_stock }}</span>
+                                <br>
+                                <small class="text-muted">Min: {{ product.reorder_level }}</small>
+                            </div>
+                        </div>
+                        {% endfor %}
+                        {% if has_permission('inventory.view') %}
+                        <div class="text-center mt-3">
+                            <a href="{{ url_for('inventory') }}" class="btn btn-outline-warning">
+                                <i class="fas fa-boxes me-1"></i>
+                                Manage Inventory
+                            </a>
+                        </div>
+                        {% endif %}
+                    {% else %}
+                        <div class="text-center py-4">
+                            <i class="fas fa-check-circle fa-3x text-success mb-3"></i>
+                            <p class="text-muted">All products are well stocked!</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <i class="fas fa-bolt me-2"></i>
+                    Quick Actions
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        {% if has_permission('inventory.edit') %}
+                        <div class="col-lg-3 col-md-6 mb-3">
+                            <a href="{{ url_for('add_product') }}" class="btn btn-primary w-100 h-100 d-flex flex-column justify-content-center align-items-center py-3">
+                                <i class="fas fa-plus-circle fa-2x mb-2"></i>
+                                <span>Add Product</span>
+                            </a>
+                        </div>
+                        {% endif %}
+                        
+                        {% if has_permission('customers.edit') %}
+                        <div class="col-lg-3 col-md-6 mb-3">
+                            <a href="{{ url_for('add_customer') }}" class="btn btn-success w-100 h-100 d-flex flex-column justify-content-center align-items-center py-3">
+                                <i class="fas fa-user-plus fa-2x mb-2"></i>
+                                <span>Add Customer</span>
+                            </a>
+                        </div>
+                        {% endif %}
+                        
+                        {% if has_permission('operations.basic') %}
+                        <div class="col-lg-3 col-md-6 mb-3">
+                            <a href="{{ url_for('add_order') }}" class="btn btn-info w-100 h-100 d-flex flex-column justify-content-center align-items-center py-3">
+                                <i class="fas fa-shopping-cart fa-2x mb-2"></i>
+                                <span>Create Order</span>
+                            </a>
+                        </div>
+                        
+                        <div class="col-lg-3 col-md-6 mb-3">
+                            <a href="{{ url_for('stock_adjustment') }}" class="btn btn-warning w-100 h-100 d-flex flex-column justify-content-center align-items-center py-3">
+                                <i class="fas fa-exchange-alt fa-2x mb-2"></i>
+                                <span>Stock Adjustment</span>
+                            </a>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
