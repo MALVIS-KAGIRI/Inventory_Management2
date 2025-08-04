@@ -1,0 +1,173 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="fade-in">
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <h1 class="text-gradient">
+                <i class="fas fa-project-diagram me-2"></i>
+                {{ project.name }}
+            </h1>
+            <p class="text-muted">
+                <strong>Code:</strong> {{ project.project_code }} | 
+                <strong>Status:</strong> 
+                <span class="badge bg-{% if project.status == 'Active' %}success{% elif project.status == 'Completed' %}info{% elif project.status == 'On Hold' %}warning{% elif project.status == 'Cancelled' %}danger{% else %}primary{% endif %}">
+                    {{ project.status }}
+                </span>
+            </p>
+        </div>
+        <div class="col-md-4 text-end">
+            {% if has_permission('projects.edit') %}
+            <a href="{{ url_for('assign_to_project', project_id=project.id) }}" class="btn btn-success">
+                <i class="fas fa-plus me-1"></i>
+                Assign Parts
+            </a>
+            {% endif %}
+            <a href="{{ url_for('projects') }}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left me-1"></i>
+                Back to Projects
+            </a>
+        </div>
+    </div>
+
+    <!-- Project Information -->
+    <div class="row mb-4">
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header">
+                    <i class="fas fa-info-circle me-2"></i>
+                    Project Information
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <p><strong>Customer:</strong> {{ project.customer.full_name if project.customer else 'N/A' }}</p>
+                            <p><strong>Priority:</strong> 
+                                <span class="badge bg-{% if project.priority == 'Critical' %}danger{% elif project.priority == 'High' %}warning{% elif project.priority == 'Medium' %}primary{% else %}secondary{% endif %}">
+                                    {{ project.priority }}
+                                </span>
+                            </p>
+                            <p><strong>Start Date:</strong> {{ project.start_date.strftime('%m/%d/%Y') if project.start_date else 'Not set' }}</p>
+                            <p><strong>End Date:</strong> {{ project.end_date.strftime('%m/%d/%Y') if project.end_date else 'Not set' }}</p>
+                        </div>
+                        <div class="col-md-6">
+                            <p><strong>Estimated Budget:</strong> ${{ "%.2f"|format(project.estimated_budget or 0) }}</p>
+                            <p><strong>Actual Cost:</strong> ${{ "%.2f"|format(project.actual_cost or 0) }}</p>
+                            <p><strong>Created:</strong> {{ project.created_at.strftime('%m/%d/%Y') }}</p>
+                            <p><strong>Last Updated:</strong> {{ project.updated_at.strftime('%m/%d/%Y') }}</p>
+                        </div>
+                    </div>
+                    {% if project.description %}
+                    <div class="mt-3">
+                        <strong>Description:</strong>
+                        <p class="mt-2">{{ project.description }}</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-lg-4">
+            <div class="card">
+                <div class="card-header">
+                    <i class="fas fa-chart-pie me-2"></i>
+                    Budget Overview
+                </div>
+                <div class="card-body">
+                    {% if project.estimated_budget and project.estimated_budget > 0 %}
+                        {% set budget_used = ((project.actual_cost or 0) / project.estimated_budget) * 100 %}
+                        <div class="text-center mb-3">
+                            <h4 class="{% if budget_used > 100 %}text-danger{% elif budget_used > 80 %}text-warning{% else %}text-success{% endif %}">
+                                {{ "%.1f"|format(budget_used) }}%
+                            </h4>
+                            <small class="text-muted">Budget Used</small>
+                        </div>
+                        <div class="progress mb-3" style="height: 20px;">
+                            <div class="progress-bar {% if budget_used > 100 %}bg-danger{% elif budget_used > 80 %}bg-warning{% else %}bg-success{% endif %}" 
+                                 style="width: {{ [budget_used, 100]|min }}%">
+                            </div>
+                        </div>
+                        <div class="d-flex justify-content-between">
+                            <small>Used: ${{ "%.2f"|format(project.actual_cost or 0) }}</small>
+                            <small>Budget: ${{ "%.2f"|format(project.estimated_budget) }}</small>
+                        </div>
+                        {% if budget_used > 100 %}
+                        <div class="alert alert-danger mt-3">
+                            <i class="fas fa-exclamation-triangle me-2"></i>
+                            Over budget by ${{ "%.2f"|format((project.actual_cost or 0) - project.estimated_budget) }}
+                        </div>
+                        {% endif %}
+                    {% else %}
+                        <div class="text-center py-3">
+                            <i class="fas fa-chart-pie fa-3x text-muted mb-3"></i>
+                            <p class="text-muted">No budget set for this project</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Assigned Parts -->
+    <div class="card">
+        <div class="card-header">
+            <i class="fas fa-boxes me-2"></i>
+            Assigned Parts
+            <span class="badge bg-primary ms-2">{{ assignments|length }} items</span>
+        </div>
+        <div class="card-body">
+            {% if assignments %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Product</th>
+                                <th>SKU</th>
+                                <th>Assigned Qty</th>
+                                <th>Used Qty</th>
+                                <th>Unit Cost</th>
+                                <th>Total Cost</th>
+                                <th>Assigned Date</th>
+                                <th>Notes</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for assignment in assignments %}
+                            <tr>
+                                <td><strong>{{ assignment.product.name }}</strong></td>
+                                <td>{{ assignment.product.sku }}</td>
+                                <td>{{ assignment.quantity_assigned }}</td>
+                                <td>{{ assignment.quantity_used }}</td>
+                                <td>${{ "%.2f"|format(assignment.unit_cost or 0) }}</td>
+                                <td>${{ "%.2f"|format(assignment.total_cost or 0) }}</td>
+                                <td>{{ assignment.assignment_date.strftime('%m/%d/%Y') }}</td>
+                                <td>{{ assignment.notes or 'N/A' }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                        <tfoot>
+                            <tr class="table-info">
+                                <th colspan="5">Total Assigned Cost:</th>
+                                <th>${{ "%.2f"|format(total_assigned_cost) }}</th>
+                                <th colspan="2"></th>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            {% else %}
+                <div class="text-center py-5">
+                    <i class="fas fa-boxes fa-4x text-muted mb-3"></i>
+                    <h4 class="text-muted">No Parts Assigned</h4>
+                    <p class="text-muted">Start by assigning inventory parts to this project.</p>
+                    {% if has_permission('projects.edit') %}
+                    <a href="{{ url_for('assign_to_project', project_id=project.id) }}" class="btn btn-success">
+                        <i class="fas fa-plus me-1"></i>
+                        Assign First Part
+                    </a>
+                    {% endif %}
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

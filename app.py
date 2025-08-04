@@ -450,6 +450,285 @@ def has_permission(permission_name):
     
     return permission in role.permissions
 
+# Analytics Routes
+@app.route('/analytics')
+@login_required
+def analytics():
+    if not has_permission('analytics.view'):
+        abort(403)
+    
+    # Get current date and calculate periods
+    today = datetime.now().date()
+    thirty_days_ago = today - timedelta(days=30)
+    this_month_start = today.replace(day=1)
+    last_month_start = (this_month_start - timedelta(days=1)).replace(day=1)
+    last_month_end = this_month_start - timedelta(days=1)
+    
+    # Inventory Analytics
+    total_products = Product.query.filter_by(is_active=True).count()
+    low_stock_count = Product.query.filter(Product.quantity_in_stock <= Product.reorder_level).count()
+    total_inventory_value = db.session.query(func.sum(Product.price * Product.quantity_in_stock)).filter_by(is_active=True).scalar() or 0
+    
+    # Top categories by product count
+    top_categories = db.session.query(
+        Category.name,
+        func.count(Product.id).label('product_count')
+    ).join(Product).filter(Product.is_active == True).group_by(Category.name).order_by(func.count(Product.id).desc()).limit(5).all()
+    
+    # Customer Analytics
+    total_customers = Customer.query.filter_by(is_active=True).count()
+    new_customers_this_month = Customer.query.filter(
+        Customer.created_at >= this_month_start,
+        Customer.is_active == True
+    ).count()
+    
+    # Customer types distribution
+    customer_types = db.session.query(
+        Customer.customer_type,
+        func.count(Customer.id).label('count')
+    ).filter_by(is_active=True).group_by(Customer.customer_type).all()
+    
+    # Sales Analytics
+    total_sales = Sale.query.count()
+    this_month_sales = Sale.query.filter(Sale.sale_date >= this_month_start).count()
+    this_month_revenue = db.session.query(func.sum(Sale.total_amount)).filter(Sale.sale_date >= this_month_start).scalar() or 0
+    last_month_revenue = db.session.query(func.sum(Sale.total_amount)).filter(
+        and_(Sale.sale_date >= last_month_start, Sale.sale_date <= last_month_end)
+    ).scalar() or 0
+    
+    # Revenue growth
+    revenue_growth = 0
+    if last_month_revenue > 0:
+        revenue_growth = ((this_month_revenue - last_month_revenue) / last_month_revenue) * 100
+    
+    # Project Analytics
+    total_projects = Project.query.count()
+    active_projects = Project.query.filter_by(status='Active').count()
+    completed_projects = Project.query.filter_by(status='Completed').count()
+    
+    # Project status distribution
+    project_status = db.session.query(
+        Project.status,
+        func.count(Project.id).label('count')
+    ).group_by(Project.status).all()
+    
+    # Recent stock movements
+    recent_movements = StockMovement.query.order_by(StockMovement.created_at.desc()).limit(10).all()
+    
+    return render_template('analytics.html',
+                         title='Analytics Dashboard',
+                         has_permission=has_permission,
+                         # Inventory
+                         total_products=total_products,
+                         low_stock_count=low_stock_count,
+                         total_inventory_value=total_inventory_value,
+                         top_categories=top_categories,
+                         # Customers
+                         total_customers=total_customers,
+                         new_customers_this_month=new_customers_this_month,
+                         customer_types=customer_types,
+                         # Sales
+                         total_sales=total_sales,
+                         this_month_sales=this_month_sales,
+                         this_month_revenue=this_month_revenue,
+                         revenue_growth=revenue_growth,
+                         # Projects
+                         total_projects=total_projects,
+                         active_projects=active_projects,
+                         completed_projects=completed_projects,
+                         project_status=project_status,
+                         recent_movements=recent_movements)
+
+# Project Management Routes
+@app.route('/projects')
+@login_required
+def projects():
+    if not has_permission('projects.view'):
+        abort(403)
+    
+    projects_list = Project.query.order_by(Project.created_at.desc()).all()
+    return render_template('projects.html', title='Project Management', projects=projects_list, has_permission=has_permission)
+
+@app.route('/projects/add', methods=['GET', 'POST'])
+@login_required
+def add_project():
+    if not has_permission('projects.edit'):
+        abort(403)
+    
+    form = ProjectForm()
+    form.customer.choices = [(0, 'Select Customer (Optional)')] + [(c.id, c.full_name) for c in Customer.query.filter_by(is_active=True).all()]
+    
+    if form.validate_on_submit():
+        # Generate project code if not provided
+        project_code = form.project_code.data
+        if not project_code:
+            project_code = 'PRJ' + ''.join(random.choices(string.digits, k=6))
+        
+        project = Project(
+            name=form.name.data,
+            description=form.description.data,
+            project_code=project_code,
+            customer_id=form.customer.data if form.customer.data != 0 else None,
+            status=form.status.data,
+            start_date=datetime.strptime(form.start_date.data, '%Y-%m-%d').date() if form.start_date.data else None,
+            end_date=datetime.strptime(form.end_date.data, '%Y-%m-%d').date() if form.end_date.data else None,
+            estimated_budget=form.estimated_budget.data,
+            priority=form.priority.data,
+            created_by=current_user.id
+        )
+        db.session.add(project)
+        db.session.commit()
+        flash('Project created successfully!', 'success')
+        return redirect(url_for('projects'))
+    
+    return render_template('add_project.html', title='Add Project', form=form, has_permission=has_permission)
+
+@app.route('/projects/<int:project_id>')
+@login_required
+def project_detail(project_id):
+    if not has_permission('projects.view'):
+        abort(403)
+    
+    project = Project.query.get_or_404(project_id)
+    assignments = ProjectAssignment.query.filter_by(project_id=project_id).all()
+    
+    # Calculate total assigned cost
+    total_assigned_cost = sum(assignment.total_cost or 0 for assignment in assignments)
+    
+    return render_template('project_detail.html', 
+                         title=f'Project: {project.name}', 
+                         project=project, 
+                         assignments=assignments,
+                         total_assigned_cost=total_assigned_cost,
+                         has_permission=has_permission)
+
+@app.route('/projects/<int:project_id>/assign', methods=['GET', 'POST'])
+@login_required
+def assign_to_project(project_id):
+    if not has_permission('projects.edit'):
+        abort(403)
+    
+    project = Project.query.get_or_404(project_id)
+    form = ProjectAssignmentForm()
+    form.product.choices = [(p.id, f"{p.name} (Stock: {p.quantity_in_stock})") for p in Product.query.filter_by(is_active=True).all()]
+    
+    if form.validate_on_submit():
+        product = Product.query.get(form.product.data)
+        
+        # Check if enough stock is available
+        if product.quantity_in_stock < form.quantity_assigned.data:
+            flash(f'Insufficient stock! Only {product.quantity_in_stock} units available.', 'danger')
+            return render_template('assign_to_project.html', title='Assign Parts', form=form, project=project, has_permission=has_permission)
+        
+        # Calculate costs
+        unit_cost = product.cost
+        total_cost = unit_cost * form.quantity_assigned.data
+        
+        # Create assignment
+        assignment = ProjectAssignment(
+            project_id=project_id,
+            product_id=form.product.data,
+            quantity_assigned=form.quantity_assigned.data,
+            unit_cost=unit_cost,
+            total_cost=total_cost,
+            notes=form.notes.data,
+            assigned_by=current_user.id
+        )
+        
+        # Update product stock
+        product.quantity_in_stock -= form.quantity_assigned.data
+        
+        # Create stock movement record
+        movement = StockMovement(
+            product_id=form.product.data,
+            movement_type='OUT',
+            quantity=form.quantity_assigned.data,
+            reference_type='PROJECT',
+            reference_id=project_id,
+            notes=f'Assigned to project: {project.name}',
+            created_by=current_user.id
+        )
+        
+        # Update project actual cost
+        project.actual_cost = (project.actual_cost or 0) + total_cost
+        
+        db.session.add(assignment)
+        db.session.add(movement)
+        db.session.commit()
+        
+        flash(f'Successfully assigned {form.quantity_assigned.data} units of {product.name} to project!', 'success')
+        return redirect(url_for('project_detail', project_id=project_id))
+    
+    return render_template('assign_to_project.html', title='Assign Parts', form=form, project=project, has_permission=has_permission)
+
+@app.route('/projects/<int:project_id>/delete', methods=['POST'])
+@login_required
+def delete_project(project_id):
+    if not has_permission('projects.delete'):
+        abort(403)
+    
+    project = Project.query.get_or_404(project_id)
+    
+    # Return assigned parts to inventory
+    for assignment in project.assignments:
+        product = assignment.product
+        product.quantity_in_stock += assignment.quantity_assigned
+        
+        # Create stock movement record
+        movement = StockMovement(
+            product_id=assignment.product_id,
+            movement_type='IN',
+            quantity=assignment.quantity_assigned,
+            reference_type='PROJECT_RETURN',
+            reference_id=project_id,
+            notes=f'Returned from deleted project: {project.name}',
+            created_by=current_user.id
+        )
+        db.session.add(movement)
+    
+    db.session.delete(project)
+    db.session.commit()
+    flash('Project deleted and parts returned to inventory!', 'success')
+    return redirect(url_for('projects'))
+
+# Sales Routes
+@app.route('/sales')
+@login_required
+def sales():
+    if not has_permission('sales.view'):
+        abort(403)
+    
+    sales_list = Sale.query.order_by(Sale.sale_date.desc()).all()
+    return render_template('sales.html', title='Sales Management', sales=sales_list, has_permission=has_permission)
+
+@app.route('/sales/add', methods=['GET', 'POST'])
+@login_required
+def add_sale():
+    if not has_permission('sales.edit'):
+        abort(403)
+    
+    form = SaleForm()
+    form.customer.choices = [(c.id, c.full_name) for c in Customer.query.filter_by(is_active=True).all()]
+    
+    if form.validate_on_submit():
+        # Generate sale number
+        sale_number = 'SAL' + ''.join(random.choices(string.digits, k=6))
+        
+        sale = Sale(
+            sale_number=sale_number,
+            customer_id=form.customer.data,
+            payment_method=form.payment_method.data,
+            payment_status=form.payment_status.data,
+            notes=form.notes.data,
+            created_by=current_user.id
+        )
+        db.session.add(sale)
+        db.session.commit()
+        flash('Sale created successfully!', 'success')
+        return redirect(url_for('sales'))
+    
+    return render_template('add_sale.html', title='Add Sale', form=form, has_permission=has_permission)
+
 # Initialize the database with default data
 def init_db():
     db.create_all()
@@ -497,6 +776,22 @@ def init_db():
             permission = Permission(name=name, description=description)
             db.session.add(permission)
     
+    # Add new permissions for analytics and projects
+    new_permissions = [
+        ('analytics.view', 'View Analytics'),
+        ('projects.view', 'View Projects'),
+        ('projects.edit', 'Edit Projects'),
+        ('projects.delete', 'Delete Projects'),
+        ('sales.view', 'View Sales'),
+        ('sales.edit', 'Edit Sales')
+    ]
+    
+    for name, description in new_permissions:
+        permission = Permission.query.filter_by(name=name).first()
+        if not permission:
+            permission = Permission(name=name, description=description)
+            db.session.add(permission)
+    
     db.session.commit()
     
     # Create default categories
@@ -536,6 +831,12 @@ def init_db():
     customers_view = Permission.query.filter_by(name='customers.view').first()
     customers_edit = Permission.query.filter_by(name='customers.edit').first()
     operations_basic = Permission.query.filter_by(name='operations.basic').first()
+    analytics_view = Permission.query.filter_by(name='analytics.view').first()
+    projects_view = Permission.query.filter_by(name='projects.view').first()
+    projects_edit = Permission.query.filter_by(name='projects.edit').first()
+    projects_delete = Permission.query.filter_by(name='projects.delete').first()
+    sales_view = Permission.query.filter_by(name='sales.view').first()
+    sales_edit = Permission.query.filter_by(name='sales.edit').first()
     
     # Admin gets all permissions
     admin_role.permissions = all_permissions
@@ -547,7 +848,12 @@ def init_db():
         inventory_edit, 
         customers_view, 
         customers_edit,
-        operations_basic
+        operations_basic,
+        analytics_view,
+        projects_view,
+        projects_edit,
+        sales_view,
+        sales_edit
     ]
     
     # Operator gets basic operation permissions
@@ -555,14 +861,19 @@ def init_db():
         dashboard_view, 
         operations_basic, 
         inventory_view, 
-        customers_view
+        customers_view,
+        projects_view,
+        sales_view
     ]
     
     # Viewer gets view-only permissions
     viewer_role.permissions = [
         dashboard_view, 
         inventory_view, 
-        customers_view
+        customers_view,
+        analytics_view,
+        projects_view,
+        sales_view
     ]
     
     db.session.commit()

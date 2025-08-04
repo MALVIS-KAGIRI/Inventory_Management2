@@ -1,0 +1,276 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="fade-in">
+    <div class="row mb-4">
+        <div class="col-12">
+            <h1 class="text-gradient mb-3">
+                <i class="fas fa-chart-bar me-2"></i>
+                Analytics Dashboard
+            </h1>
+            <p class="text-muted">Comprehensive insights into your business performance</p>
+        </div>
+    </div>
+
+    <!-- Key Metrics -->
+    <div class="row mb-4">
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="stats-card">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="stats-number">${{ "%.0f"|format(total_inventory_value) }}</div>
+                        <div class="stats-label">Inventory Value</div>
+                    </div>
+                    <div class="fs-1 opacity-75">
+                        <i class="fas fa-dollar-sign"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="stats-card success">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="stats-number">${{ "%.0f"|format(this_month_revenue) }}</div>
+                        <div class="stats-label">This Month Revenue</div>
+                        {% if revenue_growth != 0 %}
+                        <small class="{% if revenue_growth > 0 %}text-success{% else %}text-danger{% endif %}">
+                            {% if revenue_growth > 0 %}+{% endif %}{{ "%.1f"|format(revenue_growth) }}% vs last month
+                        </small>
+                        {% endif %}
+                    </div>
+                    <div class="fs-1 opacity-75">
+                        <i class="fas fa-chart-line"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="stats-card info">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="stats-number">{{ active_projects }}</div>
+                        <div class="stats-label">Active Projects</div>
+                        <small>{{ total_projects }} total projects</small>
+                    </div>
+                    <div class="fs-1 opacity-75">
+                        <i class="fas fa-project-diagram"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="stats-card {% if low_stock_count > 0 %}warning{% else %}success{% endif %}">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="stats-number">{{ low_stock_count }}</div>
+                        <div class="stats-label">Low Stock Items</div>
+                        <small>{{ total_products }} total products</small>
+                    </div>
+                    <div class="fs-1 opacity-75">
+                        <i class="fas fa-exclamation-triangle"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Inventory Analytics -->
+        <div class="col-lg-6 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <i class="fas fa-boxes me-2"></i>
+                    Inventory Analytics
+                </div>
+                <div class="card-body">
+                    <h6 class="mb-3">Top Categories by Product Count</h6>
+                    {% if top_categories %}
+                        {% for category in top_categories %}
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span>{{ category.name }}</span>
+                            <span class="badge bg-primary">{{ category.product_count }} products</span>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <p class="text-muted">No category data available</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Customer Analytics -->
+        <div class="col-lg-6 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <i class="fas fa-users me-2"></i>
+                    Customer Analytics
+                </div>
+                <div class="card-body">
+                    <div class="row mb-3">
+                        <div class="col-6">
+                            <div class="text-center">
+                                <h4 class="text-primary">{{ total_customers }}</h4>
+                                <small class="text-muted">Total Customers</small>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="text-center">
+                                <h4 class="text-success">{{ new_customers_this_month }}</h4>
+                                <small class="text-muted">New This Month</small>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <h6 class="mb-3">Customer Types</h6>
+                    {% if customer_types %}
+                        {% for customer_type in customer_types %}
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span>{{ customer_type.customer_type }}</span>
+                            <span class="badge bg-{% if customer_type.customer_type == 'VIP' %}danger{% elif customer_type.customer_type == 'Premium' %}warning{% else %}primary{% endif %}">
+                                {{ customer_type.count }}
+                            </span>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <p class="text-muted">No customer data available</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Project Analytics -->
+        <div class="col-lg-6 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <i class="fas fa-project-diagram me-2"></i>
+                    Project Analytics
+                </div>
+                <div class="card-body">
+                    <div class="row mb-3">
+                        <div class="col-4">
+                            <div class="text-center">
+                                <h4 class="text-primary">{{ total_projects }}</h4>
+                                <small class="text-muted">Total</small>
+                            </div>
+                        </div>
+                        <div class="col-4">
+                            <div class="text-center">
+                                <h4 class="text-success">{{ active_projects }}</h4>
+                                <small class="text-muted">Active</small>
+                            </div>
+                        </div>
+                        <div class="col-4">
+                            <div class="text-center">
+                                <h4 class="text-info">{{ completed_projects }}</h4>
+                                <small class="text-muted">Completed</small>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <h6 class="mb-3">Project Status Distribution</h6>
+                    {% if project_status %}
+                        {% for status in project_status %}
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span>{{ status.status }}</span>
+                            <span class="badge bg-{% if status.status == 'Active' %}success{% elif status.status == 'Completed' %}info{% elif status.status == 'On Hold' %}warning{% elif status.status == 'Cancelled' %}danger{% else %}primary{% endif %}">
+                                {{ status.count }}
+                            </span>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <p class="text-muted">No project data available</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Recent Stock Movements -->
+        <div class="col-lg-6 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <i class="fas fa-exchange-alt me-2"></i>
+                    Recent Stock Movements
+                </div>
+                <div class="card-body">
+                    {% if recent_movements %}
+                        <div class="table-responsive">
+                            <table class="table table-sm">
+                                <thead>
+                                    <tr>
+                                        <th>Product</th>
+                                        <th>Type</th>
+                                        <th>Qty</th>
+                                        <th>Date</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for movement in recent_movements %}
+                                    <tr>
+                                        <td>{{ movement.product.name }}</td>
+                                        <td>
+                                            <span class="badge bg-{% if movement.movement_type == 'IN' %}success{% elif movement.movement_type == 'OUT' %}danger{% else %}warning{% endif %}">
+                                                {{ movement.movement_type }}
+                                            </span>
+                                        </td>
+                                        <td>{{ movement.quantity }}</td>
+                                        <td>{{ movement.created_at.strftime('%m/%d') }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <p class="text-muted">No recent movements</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sales Performance -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <i class="fas fa-chart-line me-2"></i>
+                    Sales Performance
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3">
+                            <div class="text-center p-3 bg-light rounded">
+                                <h4 class="text-primary">{{ total_sales }}</h4>
+                                <small class="text-muted">Total Sales</small>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="text-center p-3 bg-light rounded">
+                                <h4 class="text-success">{{ this_month_sales }}</h4>
+                                <small class="text-muted">This Month</small>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="text-center p-3 bg-light rounded">
+                                <h4 class="text-info">${{ "%.0f"|format(this_month_revenue) }}</h4>
+                                <small class="text-muted">Revenue</small>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="text-center p-3 bg-light rounded">
+                                <h4 class="{% if revenue_growth > 0 %}text-success{% elif revenue_growth < 0 %}text-danger{% else %}text-muted{% endif %}">
+                                    {% if revenue_growth > 0 %}+{% endif %}{{ "%.1f"|format(revenue_growth) }}%
+                                </h4>
+                                <small class="text-muted">Growth</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

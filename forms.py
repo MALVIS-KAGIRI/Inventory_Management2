@@ -109,3 +109,49 @@ class StockAdjustmentForm(FlaskForm):
     quantity = IntegerField('Quantity', validators=[DataRequired(), NumberRange(min=1)])
     notes = TextAreaField('Notes')
     submit = SubmitField('Process Movement')
+
+class ProjectForm(FlaskForm):
+    name = StringField('Project Name', validators=[DataRequired()])
+    description = TextAreaField('Description')
+    project_code = StringField('Project Code', validators=[DataRequired()])
+    customer = SelectField('Customer', coerce=int, validators=[Optional()])
+    status = SelectField('Status', choices=[
+        ('Planning', 'Planning'),
+        ('Active', 'Active'),
+        ('On Hold', 'On Hold'),
+        ('Completed', 'Completed'),
+        ('Cancelled', 'Cancelled')
+    ], default='Planning')
+    start_date = StringField('Start Date')
+    end_date = StringField('End Date')
+    estimated_budget = DecimalField('Estimated Budget', validators=[Optional(), NumberRange(min=0)])
+    priority = SelectField('Priority', choices=[
+        ('Low', 'Low'),
+        ('Medium', 'Medium'),
+        ('High', 'High'),
+        ('Critical', 'Critical')
+    ], default='Medium')
+    submit = SubmitField('Save Project')
+
+class ProjectAssignmentForm(FlaskForm):
+    product = SelectField('Product', coerce=int, validators=[DataRequired()])
+    quantity_assigned = IntegerField('Quantity to Assign', validators=[DataRequired(), NumberRange(min=1)])
+    notes = TextAreaField('Notes')
+    submit = SubmitField('Assign to Project')
+
+class SaleForm(FlaskForm):
+    customer = SelectField('Customer', coerce=int, validators=[DataRequired()])
+    payment_method = SelectField('Payment Method', choices=[
+        ('Cash', 'Cash'),
+        ('Credit Card', 'Credit Card'),
+        ('Check', 'Check'),
+        ('Bank Transfer', 'Bank Transfer')
+    ], default='Cash')
+    payment_status = SelectField('Payment Status', choices=[
+        ('Pending', 'Pending'),
+        ('Paid', 'Paid'),
+        ('Partial', 'Partial'),
+        ('Overdue', 'Overdue')
+    ], default='Pending')
+    notes = TextAreaField('Notes')
+    submit = SubmitField('Create Sale')

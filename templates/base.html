@@ -91,6 +91,33 @@
                     </li>
                     {% endif %}
                     
+                    {% if has_permission('projects.view') %}
+                    <li class="nav-item">
+                        <a class="nav-link {% if 'project' in request.endpoint %}active{% endif %}" href="{{ url_for('projects') }}">
+                            <i class="fas fa-project-diagram me-1"></i>
+                            Projects
+                        </a>
+                    </li>
+                    {% endif %}
+                    
+                    {% if has_permission('sales.view') %}
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.endpoint == 'sales' %}active{% endif %}" href="{{ url_for('sales') }}">
+                            <i class="fas fa-chart-line me-1"></i>
+                            Sales
+                        </a>
+                    </li>
+                    {% endif %}
+                    
+                    {% if has_permission('analytics.view') %}
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.endpoint == 'analytics' %}active{% endif %}" href="{{ url_for('analytics') }}">
+                            <i class="fas fa-analytics me-1"></i>
+                            Analytics
+                        </a>
+                    </li>
+                    {% endif %}
+                    
                     {% if has_permission('roles.manage') %}
                     <li class="nav-item">
                         <a class="nav-link {% if request.endpoint == 'roles' %}active{% endif %}" href="{{ url_for('roles') }}">
