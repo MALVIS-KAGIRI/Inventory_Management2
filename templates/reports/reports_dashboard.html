@@ -1,0 +1,255 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="fade-in">
+    <div class="row mb-4">
+        <div class="col-12">
+            <h1 class="text-gradient mb-3">
+                <i class="fas fa-chart-bar me-2"></i>
+                Reports Dashboard
+            </h1>
+            <p class="text-muted">Generate comprehensive reports for your business insights</p>
+        </div>
+    </div>
+
+    <!-- Report Categories -->
+    <div class="row">
+        <!-- Inventory Reports -->
+        <div class="col-lg-6 col-xl-4 mb-4">
+            <div class="card h-100">
+                <div class="card-header bg-primary text-white">
+                    <i class="fas fa-boxes me-2"></i>
+                    Inventory Reports
+                </div>
+                <div class="card-body">
+                    <div class="list-group list-group-flush">
+                        <a href="{{ url_for('generate_report', report_type='inventory_status') }}" class="list-group-item list-group-item-action">
+                            <i class="fas fa-list me-2"></i>Inventory Status Report
+                        </a>
+                        <a href="{{ url_for('generate_report', report_type='low_stock') }}" class="list-group-item list-group-item-action">
+                            <i class="fas fa-exclamation-triangle me-2"></i>Low Stock Report
+                        </a>
+                        <a href="{{ url_for('generate_report', report_type='stock_movement') }}" class="list-group-item list-group-item-action">
+                            <i class="fas fa-exchange-alt me-2"></i>Stock Movement History
+                        </a>
+                        <a href="{{ url_for('generate_report', report_type='inventory_valuation') }}" class="list-group-item list-group-item-action">
+                            <i class="fas fa-dollar-sign me-2"></i>Inventory Valuation
+                        </a>
+                        <a href="{{ url_for('generate_report', report_type='inventory_aging') }}" class="list-group-item list-group-item-action">
+                            <i class="fas fa-clock me-2"></i>Inventory Aging Analysis
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Purchase & Supplier Reports -->
+        <div class="col-lg-6 col-xl-4 mb-4">
+            <div class="card h-100">
+                <div class="card-header bg-success text-white">
+                    <i class="fas fa-truck me-2"></i>
+                    Purchase & Supplier Reports
+                </div>
+                <div class="card-body">
+                    <div class="list-group list-group-flush">
+                        <a href="{{ url_for('generate_report', report_type='supplier_performance') }}" class="list-group-item list-group-item-action">
+                            <i class="fas fa-chart-line me-2"></i>Supplier Performance
+                        </a>
+                        <a href="{{ url_for('generate_report', report_type='cost_analysis') }}" class="list-group-item list-group-item-action">
+                            <i class="fas fa-calculator me-2"></i>Cost Analysis
+                        </a>
+                        <a href="{{ url_for('generate_report', report_type='reorder_suggestions') }}" class="list-group-item list-group-item-action">
+                            <i class="fas fa-shopping-cart me-2"></i>Reorder Suggestions
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sales & Profitability Reports -->
+        <div class="col-lg-6 col-xl-4 mb-4">
+            <div class="card h-100">
+                <div class="card-header bg-info text-white">
+                    <i class="fas fa-chart-pie me-2"></i>
+                    Sales & Profitability Reports
+                </div>
+                <div class="card-body">
+                    <div class="list-group list-group-flush">
+                        <a href="{{ url_for('generate_report', report_type='sales_history') }}" class="list-group-item list-group-item-action">
+                            <i class="fas fa-history me-2"></i>Sales History
+                        </a>
+                        <a href="{{ url_for('generate_report', report_type='product_performance') }}" class="list-group-item list-group-item-action">
+                            <i class="fas fa-star me-2"></i>Product Performance
+                        </a>
+                        <a href="{{ url_for('generate_report', report_type='customer_sales') }}" class="list-group-item list-group-item-action">
+                            <i class="fas fa-users me-2"></i>Customer Sales Analysis
+                        </a>
+                        <a href="{{ url_for('generate_report', report_type='profit_margin') }}" class="list-group-item list-group-item-action">
+                            <i class="fas fa-percentage me-2"></i>Profit Margin Analysis
+                        </a>
+                        <a href="{{ url_for('generate_report', report_type='payment_collection') }}" class="list-group-item list-group-item-action">
+                            <i class="fas fa-credit-card me-2"></i>Payment Collection
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Performance & Forecasting Reports -->
+        <div class="col-lg-6 col-xl-4 mb-4">
+            <div class="card h-100">
+                <div class="card-header bg-warning text-white">
+                    <i class="fas fa-chart-area me-2"></i>
+                    Performance & Forecasting
+                </div>
+                <div class="card-body">
+                    <div class="list-group list-group-flush">
+                        <a href="{{ url_for('generate_report', report_type='sales_trend') }}" class="list-group-item list-group-item-action">
+                            <i class="fas fa-trending-up me-2"></i>Sales Trend Analysis
+                        </a>
+                        <a href="{{ url_for('generate_report', report_type='inventory_turnover') }}" class="list-group-item list-group-item-action">
+                            <i class="fas fa-sync me-2"></i>Inventory Turnover
+                        </a>
+                        <a href="{{ url_for('generate_report', report_type='revenue_forecast') }}" class="list-group-item list-group-item-action">
+                            <i class="fas fa-crystal-ball me-2"></i>Revenue Forecast
+                        </a>
+                        <a href="{{ url_for('generate_report', report_type='business_growth') }}" class="list-group-item list-group-item-action">
+                            <i class="fas fa-chart-bar me-2"></i>Business Growth
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Compliance & Audit Reports -->
+        <div class="col-lg-6 col-xl-4 mb-4">
+            <div class="card h-100">
+                <div class="card-header bg-danger text-white">
+                    <i class="fas fa-shield-alt me-2"></i>
+                    Compliance & Audit Reports
+                </div>
+                <div class="card-body">
+                    <div class="list-group list-group-flush">
+                        <a href="{{ url_for('generate_report', report_type='stock_audit') }}" class="list-group-item list-group-item-action">
+                            <i class="fas fa-clipboard-check me-2"></i>Stock Audit Report
+                        </a>
+                        <a href="{{ url_for('generate_report', report_type='user_activity') }}" class="list-group-item list-group-item-action">
+                            <i class="fas fa-user-clock me-2"></i>User Activity Logs
+                        </a>
+                        <a href="{{ url_for('generate_report', report_type='price_changes') }}" class="list-group-item list-group-item-action">
+                            <i class="fas fa-tags me-2"></i>Price Change History
+                        </a>
+                        <a href="{{ url_for('generate_report', report_type='tax_report') }}" class="list-group-item list-group-item-action">
+                            <i class="fas fa-receipt me-2"></i>Tax Report
+                        </a>
+                        <a href="{{ url_for('generate_report', report_type='custom_report') }}" class="list-group-item list-group-item-action">
+                            <i class="fas fa-cog me-2"></i>Custom Report
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="col-lg-6 col-xl-4 mb-4">
+            <div class="card h-100">
+                <div class="card-header bg-secondary text-white">
+                    <i class="fas fa-bolt me-2"></i>
+                    Quick Actions
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        <button class="btn btn-outline-primary" onclick="generateQuickReport('low_stock')">
+                            <i class="fas fa-exclamation-triangle me-2"></i>
+                            Quick Low Stock Check
+                        </button>
+                        <button class="btn btn-outline-success" onclick="generateQuickReport('daily_summary')">
+                            <i class="fas fa-calendar-day me-2"></i>
+                            Daily Summary
+                        </button>
+                        <button class="btn btn-outline-info" onclick="generateQuickReport('weekly_summary')">
+                            <i class="fas fa-calendar-week me-2"></i>
+                            Weekly Summary
+                        </button>
+                        <button class="btn btn-outline-warning" onclick="sendLowStockAlert()">
+                            <i class="fas fa-envelope me-2"></i>
+                            Send Low Stock Alert
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function generateQuickReport(reportType) {
+    // Show loading
+    const btn = event.target;
+    const originalText = btn.innerHTML;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Generating...';
+    btn.disabled = true;
+    
+    // Generate report with default parameters
+    const today = new Date().toISOString().split('T')[0];
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    
+    const url = `/reports/generate/${reportType}?start_date=${thirtyDaysAgo}&end_date=${today}&format=pdf`;
+    
+    fetch(url)
+        .then(response => {
+            if (response.ok) {
+                return response.blob();
+            }
+            throw new Error('Report generation failed');
+        })
+        .then(blob => {
+            // Download the report
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${reportType}_${today}.pdf`;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+        })
+        .catch(error => {
+            alert('Failed to generate report: ' + error.message);
+        })
+        .finally(() => {
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+        });
+}
+
+function sendLowStockAlert() {
+    const btn = event.target;
+    const originalText = btn.innerHTML;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Sending...';
+    btn.disabled = true;
+    
+    fetch('/api/send-low-stock-alert', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('Low stock alert sent successfully!');
+        } else {
+            alert('Failed to send alert: ' + data.message);
+        }
+    })
+    .catch(error => {
+        alert('Failed to send alert: ' + error.message);
+    })
+    .finally(() => {
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+    });
+}
+</script>
+{% endblock %}

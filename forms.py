@@ -2,6 +2,7 @@ from flask_wtf import FlaskForm
 from wtforms import StringField, TextAreaField, SelectField, IntegerField, DecimalField, BooleanField, SubmitField, PasswordField, DateField
 from wtforms.validators import DataRequired, Email, Length, EqualTo, Optional, NumberRange
 from datetime import datetime, timedelta
+from models import Category, Supplier, Customer, Product, User
 
 class LoginForm(FlaskForm):
     username = StringField('Username', validators=[DataRequired(), Length(min=3, max=20)])
@@ -45,15 +46,61 @@ class SupplierForm(FlaskForm):
     submit = SubmitField('Save')
 
 class CustomerForm(FlaskForm):
+    # Basic Information
     first_name = StringField('First Name', validators=[DataRequired(), Length(max=50)])
     last_name = StringField('Last Name', validators=[DataRequired(), Length(max=50)])
+    
+    # Organization fields (optional for individual customers)
+    company_name = StringField('Company Name', validators=[Optional(), Length(max=100)])
+    tax_id = StringField('Tax ID/EIN', validators=[Optional(), Length(max=20)])
+    
+    # Contact Information
     email = StringField('Email', validators=[DataRequired(), Email(), Length(max=120)])
     phone = StringField('Phone', validators=[Length(max=20)])
+    website = StringField('Website', validators=[Optional(), Length(max=200)])
+    
+    # Address Information
     address = TextAreaField('Address')
     city = StringField('City', validators=[Length(max=50)])
     state = StringField('State', validators=[Length(max=50)])
     zip_code = StringField('ZIP Code', validators=[Length(max=10)])
+    country = StringField('Country', validators=[Optional(), Length(max=50)], default='United States')
+    
+    # Customer Classification
     customer_type = SelectField('Customer Type', choices=[('Regular', 'Regular'), ('Premium', 'Premium'), ('VIP', 'VIP')])
+    customer_category = SelectField('Customer Category', choices=[
+        ('Individual', 'Individual Customer'),
+        ('Business', 'Business/Organization'),
+        ('Government', 'Government Entity'),
+        ('Non-Profit', 'Non-Profit Organization')
+    ], default='Individual')
+    
+    # Business Information
+    industry = StringField('Industry', validators=[Optional(), Length(max=100)])
+    annual_revenue = DecimalField('Annual Revenue', validators=[Optional(), NumberRange(min=0)])
+    employee_count = IntegerField('Employee Count', validators=[Optional(), NumberRange(min=0)])
+    
+    # Preferences
+    preferred_contact_method = SelectField('Preferred Contact Method', choices=[
+        ('Email', 'Email'),
+        ('Phone', 'Phone'),
+        ('Mail', 'Mail'),
+        ('SMS', 'SMS')
+    ], default='Email')
+    
+    # Credit Information
+    credit_limit = DecimalField('Credit Limit', validators=[Optional(), NumberRange(min=0)])
+    payment_terms = SelectField('Payment Terms', choices=[
+        ('Net 15', 'Net 15 Days'),
+        ('Net 30', 'Net 30 Days'),
+        ('Net 45', 'Net 45 Days'),
+        ('Net 60', 'Net 60 Days'),
+        ('COD', 'Cash on Delivery'),
+        ('Prepaid', 'Prepaid')
+    ], default='Net 30')
+    
+    # Notes and Status
+    notes = TextAreaField('Notes')
     is_active = BooleanField('Active')
     submit = SubmitField('Save')
 
@@ -190,3 +237,40 @@ class ComplianceReportForm(ReportFilterForm):
         ('purchase', 'Purchase Activities'),
         ('user_mgmt', 'User Management')
     ], default='all')
+
+class ReportGenerationForm(FlaskForm):
+    report_type = SelectField('Report Type', validators=[DataRequired()])
+    start_date = StringField('Start Date', validators=[DataRequired()], 
+                           default=lambda: (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d'))
+    end_date = StringField('End Date', validators=[DataRequired()], 
+                         default=lambda: datetime.now().strftime('%Y-%m-%d'))
+    export_format = SelectField('Export Format', choices=[
+        ('pdf', 'PDF'),
+        ('csv', 'CSV'),
+        ('excel', 'Excel')
+    ], default='pdf')
+    
+    # Optional filters
+    category_id = SelectField('Category', coerce=int, validators=[Optional()], default=0)
+    supplier_id = SelectField('Supplier', coerce=int, validators=[Optional()], default=0)
+    customer_id = SelectField('Customer', coerce=int, validators=[Optional()], default=0)
+    product_id = SelectField('Product', coerce=int, validators=[Optional()], default=0)
+    user_id = SelectField('User', coerce=int, validators=[Optional()], default=0)
+    
+    # Additional options
+    include_inactive = BooleanField('Include Inactive Items', default=False)
+    email_report = BooleanField('Email Report', default=False)
+    email_recipients = StringField('Email Recipients', validators=[Optional()], 
+                                 description='Comma-separated email addresses')
+    
+    submit = SubmitField('Generate Report')
+    
+    def __init__(self, *args, **kwargs):
+        super(ReportGenerationForm, self).__init__(*args, **kwargs)
+        
+        # Populate choices dynamically
+        self.category_id.choices = [(0, 'All Categories')] + [(c.id, c.name) for c in Category.query.all()]
+        self.supplier_id.choices = [(0, 'All Suppliers')] + [(s.id, s.name) for s in Supplier.query.filter_by(is_active=True).all()]
+        self.customer_id.choices = [(0, 'All Customers')] + [(c.id, c.full_name) for c in Customer.query.filter_by(is_active=True).all()]
+        self.product_id.choices = [(0, 'All Products')] + [(p.id, f"{p.name} ({p.sku})") for p in Product.query.filter_by(is_active=True).all()]
+        self.user_id.choices = [(0, 'All Users')] + [(u.id, u.username) for u in User.query.filter_by(is_active=True).all()]

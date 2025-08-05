@@ -68,20 +68,63 @@ class Customer(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     first_name = db.Column(db.String(50), nullable=False)
     last_name = db.Column(db.String(50), nullable=False)
+    
+    # Organization fields
+    company_name = db.Column(db.String(100))
+    tax_id = db.Column(db.String(20))
+    
+    # Contact Information
     email = db.Column(db.String(120), unique=True, nullable=False)
     phone = db.Column(db.String(20))
+    website = db.Column(db.String(200))
+    
+    # Address Information
     address = db.Column(db.Text)
     city = db.Column(db.String(50))
     state = db.Column(db.String(50))
     zip_code = db.Column(db.String(10))
+    country = db.Column(db.String(50), default='United States')
+    
+    # Customer Classification
     customer_type = db.Column(db.String(20), default='Regular')  # Regular, Premium, VIP
+    customer_category = db.Column(db.String(20), default='Individual')  # Individual, Business, Government, Non-Profit
+    
+    # Business Information
+    industry = db.Column(db.String(100))
+    annual_revenue = db.Column(db.Numeric(15, 2))
+    employee_count = db.Column(db.Integer)
+    
+    # Preferences
+    preferred_contact_method = db.Column(db.String(20), default='Email')
+    
+    # Credit Information
+    credit_limit = db.Column(db.Numeric(10, 2))
+    payment_terms = db.Column(db.String(20), default='Net 30')
+    
+    # Notes and Status
+    notes = db.Column(db.Text)
     is_active = db.Column(db.Boolean, default=True, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     orders = db.relationship('Order', backref='customer', lazy=True)
 
     @property
     def full_name(self):
+        if self.company_name:
+            return f"{self.company_name} ({self.first_name} {self.last_name})"
         return f"{self.first_name} {self.last_name}"
+    
+    @property
+    def display_name(self):
+        """Display name for dropdowns and lists"""
+        if self.customer_category == 'Individual':
+            return self.full_name
+        else:
+            return self.company_name or self.full_name
+    
+    @property
+    def is_business(self):
+        """Check if this is a business customer"""
+        return self.customer_category in ['Business', 'Government', 'Non-Profit']
 
 class Order(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -172,3 +215,26 @@ class SaleItem(db.Model):
     unit_price = db.Column(db.Numeric(10, 2), nullable=False)
     total_price = db.Column(db.Numeric(10, 2), nullable=False)
     product = db.relationship('Product', backref='sale_items')
+
+class EmailAlert(db.Model):
+    """Track email alerts sent by the system"""
+    id = db.Column(db.Integer, primary_key=True)
+    alert_type = db.Column(db.String(50), nullable=False)  # low_stock, report, etc.
+    recipient_email = db.Column(db.String(120), nullable=False)
+    subject = db.Column(db.String(200), nullable=False)
+    sent_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    status = db.Column(db.String(20), default='sent')  # sent, failed, pending
+    error_message = db.Column(db.Text)
+    
+class ReportGeneration(db.Model):
+    """Track generated reports"""
+    id = db.Column(db.Integer, primary_key=True)
+    report_type = db.Column(db.String(50), nullable=False)
+    report_title = db.Column(db.String(200), nullable=False)
+    file_path = db.Column(db.String(500))
+    file_format = db.Column(db.String(10), nullable=False)  # pdf, csv, excel
+    generated_by = db.Column(db.Integer, db.ForeignKey('user.id'))
+    generated_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    parameters = db.Column(db.Text)  # JSON string of report parameters
+    file_size = db.Column(db.Integer)  # File size in bytes
+    download_count = db.Column(db.Integer, default=0)

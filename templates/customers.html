@@ -46,6 +46,9 @@
                                 <td>
                                     <strong>{{ customer.full_name }}</strong>
                                     <br><small class="text-muted">Member since {{ customer.created_at.strftime('%m/%d/%Y') }}</small>
+                                    {% if customer.company_name %}
+                                        <br><small class="text-info"><i class="fas fa-building me-1"></i>{{ customer.company_name }}</small>
+                                    {% endif %}
                                 </td>
                                 <td>{{ customer.email }}</td>
                                 <td>{{ customer.phone or 'N/A' }}</td>
@@ -69,7 +72,9 @@
                                 <td>
                                     {% if has_permission('customers.edit') %}
                                     <button class="btn btn-sm btn-outline-primary me-1">
+                                        <a href="{{ url_for('edit_customer', customer_id=customer.id) }}" class="btn btn-sm btn-outline-primary me-1">
                                         <i class="fas fa-edit"></i>
+                                        </a>
                                     </button>
                                     <button class="btn btn-sm btn-outline-info me-1">
                                         <i class="fas fa-eye"></i>

@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>{{ title }}</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            margin: 0;
+            padding: 20px;
+            color: #333;
+            line-height: 1.4;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            border-bottom: 2px solid #4f46e5;
+            padding-bottom: 20px;
+        }
+        
+        .header h1 {
+            color: #4f46e5;
+            margin: 0;
+            font-size: 24px;
+        }
+        
+        .header .subtitle {
+            color: #666;
+            margin: 5px 0;
+            font-size: 14px;
+        }
+        
+        .report-info {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            border-left: 4px solid #4f46e5;
+        }
+        
+        .report-info h3 {
+            margin: 0 0 10px 0;
+            color: #4f46e5;
+            font-size: 16px;
+        }
+        
+        .report-info p {
+            margin: 5px 0;
+            font-size: 12px;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            font-size: 11px;
+        }
+        
+        th {
+            background-color: #4f46e5;
+            color: white;
+            padding: 10px 8px;
+            text-align: left;
+            font-weight: bold;
+            border: 1px solid #ddd;
+        }
+        
+        td {
+            padding: 8px;
+            border: 1px solid #ddd;
+            vertical-align: top;
+        }
+        
+        tr:nth-child(even) {
+            background-color: #f8f9fa;
+        }
+        
+        tr:hover {
+            background-color: #e9ecef;
+        }
+        
+        .text-right {
+            text-align: right;
+        }
+        
+        .text-center {
+            text-align: center;
+        }
+        
+        .badge {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 10px;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+        
+        .badge-success {
+            background-color: #28a745;
+            color: white;
+        }
+        
+        .badge-warning {
+            background-color: #ffc107;
+            color: #212529;
+        }
+        
+        .badge-danger {
+            background-color: #dc3545;
+            color: white;
+        }
+        
+        .badge-info {
+            background-color: #17a2b8;
+            color: white;
+        }
+        
+        .badge-primary {
+            background-color: #4f46e5;
+            color: white;
+        }
+        
+        .footer {
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 1px solid #ddd;
+            text-align: center;
+            font-size: 10px;
+            color: #666;
+        }
+        
+        .summary-box {
+            background-color: #e3f2fd;
+            border: 1px solid #2196f3;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 20px 0;
+        }
+        
+        .summary-box h4 {
+            margin: 0 0 10px 0;
+            color: #1976d2;
+        }
+        
+        .no-data {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+            font-style: italic;
+        }
+        
+        @page {
+            margin: 1cm;
+            @bottom-center {
+                content: "Page " counter(page) " of " counter(pages);
+                font-size: 10px;
+                color: #666;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>{{ title }}</h1>
+        <div class="subtitle">Inventory Management System</div>
+        <div class="subtitle">Generated on {{ current_date }}</div>
+    </div>
+    
+    <div class="report-info">
+        <h3>Report Information</h3>
+        <p><strong>Report Type:</strong> {{ title }}</p>
+        <p><strong>Generated:</strong> {{ current_date }}</p>
+        <p><strong>Total Records:</strong> {{ data|length }}</p>
+    </div>
+    
+    {% if data %}
+        <table>
+            <thead>
+                <tr>
+                    {% for header in headers %}
+                    <th>{{ header.replace('_', ' ').title() }}</th>
+                    {% endfor %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in data %}
+                <tr>
+                    {% for header in headers %}
+                    <td>
+                        {% set value = row.get(header, '') %}
+                        {% if header in ['price', 'cost', 'total_amount', 'subtotal', 'tax_amount', 'estimated_budget', 'actual_cost', 'stock_value', 'inventory_value', 'total_cost', 'unit_cost'] %}
+                            {% if value %}${{ "%.2f"|format(value) }}{% else %}$0.00{% endif %}
+                        {% elif header in ['is_active', 'needs_reorder'] %}
+                            {% if value %}
+                                <span class="badge badge-{% if value == 'Yes' or value == True %}success{% else %}danger{% endif %}">
+                                    {% if value == True %}Yes{% elif value == False %}No{% else %}{{ value }}{% endif %}
+                                </span>
+                            {% endif %}
+                        {% elif header in ['status', 'payment_status', 'customer_type', 'priority'] %}
+                            {% if value %}
+                                <span class="badge badge-{% if value in ['Active', 'Paid', 'Delivered', 'Completed'] %}success{% elif value in ['Pending', 'Processing', 'Medium'] %}warning{% elif value in ['Cancelled', 'Overdue', 'High', 'Critical'] %}danger{% else %}info{% endif %}">
+                                    {{ value }}
+                                </span>
+                            {% endif %}
+                        {% elif header in ['created_at', 'updated_at', 'sale_date', 'order_date', 'last_login', 'assignment_date', 'start_date', 'end_date'] %}
+                            {% if value %}{{ value.strftime('%m/%d/%Y') if value.strftime else value }}{% endif %}
+                        {% else %}
+                            {{ value }}
+                        {% endif %}
+                    </td>
+                    {% endfor %}
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <div class="no-data">
+            <p>No data available for the selected criteria.</p>
+        </div>
+    {% endif %}
+    
+    <div class="footer">
+        <p>This report was automatically generated by the Inventory Management System.</p>
+        <p>For questions or support, please contact your system administrator.</p>
+    </div>
+</body>
+</html>

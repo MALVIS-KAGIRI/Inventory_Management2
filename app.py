@@ -13,6 +13,15 @@ from forms import *
 from sqlalchemy import func
 import random
 import string
+from reports_inventory import InventoryReportGenerator
+from reports_purchase import PurchaseReportGenerator
+from reports_sales import SalesReportGenerator
+from reports_compliance import ComplianceReportGenerator
+from email_service import email_service
+from tasks import task_scheduler
+import tempfile
+import os
+from flask import jsonify, send_file
 
 # Initialize Flask application
 app = Flask(__name__)
@@ -25,6 +34,9 @@ bcrypt = Bcrypt(app)
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
 login_manager.login_message_category = 'info'
+
+# Start background tasks
+task_scheduler.start()
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -89,6 +101,252 @@ def dashboard():
                          low_stock_products=low_stock_products,
                          recent_orders=recent_orders,
                          low_stock_items=low_stock_items)
+
+@app.route('/reports')
+@login_required
+def reports_dashboard():
+    """Reports dashboard"""
+    if not has_permission('analytics.view'):
+        abort(403)
+    
+    return render_template('reports/reports_dashboard.html', title='Reports Dashboard', has_permission=has_permission)
+
+@app.route('/reports/generate/<report_type>')
+@login_required
+def generate_report_form(report_type):
+    """Show report generation form"""
+    if not has_permission('analytics.view'):
+        abort(403)
+    
+    form = ReportGenerationForm()
+    
+    # Set report type choices based on the requested type
+    report_types = {
+        'inventory_status': 'Inventory Status Report',
+        'low_stock': 'Low Stock Report',
+        'stock_movement': 'Stock Movement History',
+        'inventory_valuation': 'Inventory Valuation Report',
+        'inventory_aging': 'Inventory Aging Analysis',
+        'supplier_performance': 'Supplier Performance Analysis',
+        'cost_analysis': 'Purchase Cost Analysis',
+        'reorder_suggestions': 'Reorder Suggestions Report',
+        'sales_history': 'Sales History Report',
+        'product_performance': 'Product Sales Performance',
+        'customer_sales': 'Customer Sales Analysis',
+        'profit_margin': 'Profit Margin Analysis',
+        'payment_collection': 'Payment Collection Status',
+        'sales_trend': 'Sales Trend Analysis',
+        'inventory_turnover': 'Inventory Turnover Analysis',
+        'revenue_forecast': 'Revenue Forecast Report',
+        'business_growth': 'Business Growth Analysis',
+        'stock_audit': 'Stock Audit Report',
+        'user_activity': 'User Activity Logs',
+        'price_changes': 'Price Change History',
+        'tax_report': 'Tax Calculation Report',
+        'custom_report': 'Custom Business Report'
+    }
+    
+    form.report_type.choices = [(report_type, report_types.get(report_type, report_type.title()))]
+    form.report_type.data = report_type
+    
+    if form.validate_on_submit():
+        return redirect(url_for('generate_report_data', 
+                              report_type=form.report_type.data,
+                              start_date=form.start_date.data,
+                              end_date=form.end_date.data,
+                              format=form.export_format.data,
+                              category_id=form.category_id.data,
+                              supplier_id=form.supplier_id.data,
+                              customer_id=form.customer_id.data,
+                              product_id=form.product_id.data,
+                              user_id=form.user_id.data,
+                              include_inactive=form.include_inactive.data,
+                              email_report=form.email_report.data,
+                              email_recipients=form.email_recipients.data))
+    
+    return render_template('reports/generate_report.html', 
+                         title=f'Generate {report_types.get(report_type, report_type.title())}',
+                         form=form, 
+                         report_type=report_type,
+                         has_permission=has_permission)
+
+@app.route('/reports/generate-data/<report_type>')
+@login_required
+def generate_report_data(report_type):
+    """Generate and return report data"""
+    if not has_permission('analytics.view'):
+        abort(403)
+    
+    # Get parameters from request
+    start_date = request.args.get('start_date')
+    end_date = request.args.get('end_date')
+    export_format = request.args.get('format', 'pdf')
+    category_id = request.args.get('category_id', 0)
+    supplier_id = request.args.get('supplier_id', 0)
+    customer_id = request.args.get('customer_id', 0)
+    product_id = request.args.get('product_id', 0)
+    user_id = request.args.get('user_id', 0)
+    include_inactive = request.args.get('include_inactive', 'false').lower() == 'true'
+    email_report = request.args.get('email_report', 'false').lower() == 'true'
+    email_recipients = request.args.get('email_recipients', '')
+    
+    try:
+        # Generate report data based on type
+        data = []
+        headers = []
+        title = report_type.replace('_', ' ').title()
+        
+        # Inventory Reports
+        if report_type == 'inventory_status':
+            data = InventoryReportGenerator.generate_inventory_status_report(
+                start_date, end_date, category_id, supplier_id, include_inactive)
+            headers = ['name', 'sku', 'category_name', 'supplier_name', 'price', 'cost', 
+                      'quantity_in_stock', 'reorder_level', 'stock_value', 'needs_reorder', 'is_active']
+            title = 'Inventory Status Report'
+            
+        elif report_type == 'low_stock':
+            data = InventoryReportGenerator.generate_low_stock_report(
+                start_date, end_date, category_id, supplier_id)
+            headers = ['name', 'sku', 'category_name', 'supplier_name', 'quantity_in_stock', 
+                      'reorder_level', 'shortage', 'stock_value', 'shortage_value']
+            title = 'Low Stock Report'
+            
+        elif report_type == 'stock_movement':
+            data = InventoryReportGenerator.generate_stock_movement_history(
+                start_date, end_date, category_id, supplier_id)
+            headers = ['product_name', 'product_sku', 'movement_type', 'quantity', 
+                      'reference', 'user_name', 'created_at', 'notes']
+            title = 'Stock Movement History'
+            
+        elif report_type == 'inventory_valuation':
+            data = InventoryReportGenerator.generate_inventory_valuation_report(
+                start_date, end_date, category_id, supplier_id, include_inactive)
+            headers = ['name', 'sku', 'category_name', 'quantity_in_stock', 'cost', 'price',
+                      'cost_value', 'retail_value', 'profit_potential', 'margin_percentage']
+            title = 'Inventory Valuation Report'
+            
+        elif report_type == 'inventory_aging':
+            data = InventoryReportGenerator.generate_inventory_aging_analysis(
+                start_date, end_date, category_id, supplier_id)
+            headers = ['name', 'sku', 'category_name', 'quantity_in_stock', 'days_in_stock',
+                      'aging_category', 'inventory_value', 'last_movement_date']
+            title = 'Inventory Aging Analysis'
+            
+        # Purchase Reports
+        elif report_type == 'supplier_performance':
+            data = PurchaseReportGenerator.generate_supplier_performance_analysis(
+                start_date, end_date, supplier_id)
+            headers = ['name', 'contact_person', 'email', 'phone', 'product_count',
+                      'total_orders', 'on_time_delivery_rate', 'quality_rejection_rate']
+            title = 'Supplier Performance Analysis'
+            
+        elif report_type == 'cost_analysis':
+            data = PurchaseReportGenerator.generate_cost_analysis(
+                start_date, end_date, supplier_id)
+            headers = ['name', 'sku', 'category_name', 'supplier_name', 'cost', 'price',
+                      'margin', 'margin_percentage']
+            title = 'Purchase Cost Analysis'
+            
+        elif report_type == 'reorder_suggestions':
+            data = PurchaseReportGenerator.generate_reorder_suggestions_report(
+                start_date, end_date, supplier_id)
+            headers = ['name', 'sku', 'category_name', 'supplier_name', 'quantity_in_stock',
+                      'reorder_level', 'reorder_amount', 'estimated_cost', 'priority']
+            title = 'Reorder Suggestions Report'
+            
+        # Sales Reports
+        elif report_type == 'sales_history':
+            data = SalesReportGenerator.generate_sales_history_report(
+                start_date, end_date, customer_id, 'all')
+            headers = ['sale_number', 'customer_name', 'sale_date', 'total_amount',
+                      'payment_method', 'payment_status', 'created_by_username']
+            title = 'Sales History Report'
+            
+        elif report_type == 'product_performance':
+            data = SalesReportGenerator.generate_product_performance_report(
+                start_date, end_date, product_id)
+            headers = ['name', 'sku', 'category_name', 'total_quantity_sold', 'total_revenue',
+                      'profit', 'profit_margin', 'current_stock']
+            title = 'Product Sales Performance'
+            
+        elif report_type == 'customer_sales':
+            data = SalesReportGenerator.generate_customer_sales_report(
+                start_date, end_date, customer_id)
+            headers = ['name', 'customer_type', 'total_orders', 'total_spent',
+                      'avg_order_value', 'last_order_date', 'days_since_last_order']
+            title = 'Customer Sales Analysis'
+            
+        # Compliance Reports
+        elif report_type == 'stock_audit':
+            data = ComplianceReportGenerator.generate_stock_audit_report(
+                start_date, end_date, category_id, supplier_id)
+            headers = ['name', 'sku', 'category_name', 'supplier_name', 'quantity_in_stock',
+                      'stock_value', 'last_movement', 'movement_count']
+            title = 'Stock Audit Report'
+            
+        elif report_type == 'user_activity':
+            data = ComplianceReportGenerator.generate_user_activity_report(
+                start_date, end_date, user_id, 'all')
+            headers = ['user_name', 'activity_type', 'product_name', 'quantity',
+                      'created_at', 'description']
+            title = 'User Activity Logs'
+            
+        elif report_type == 'custom_report':
+            data = ComplianceReportGenerator.generate_custom_report(start_date, end_date)
+            headers = ['metric', 'value', 'category']
+            title = 'Custom Business Report'
+        
+        # Generate file based on format
+        if export_format == 'csv':
+            filename = f"{report_type}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+            response = InventoryReportGenerator.export_as_csv(data, filename, headers)
+        elif export_format == 'excel':
+            filename = f"{report_type}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+            response = InventoryReportGenerator.export_as_excel(data, filename, headers)
+        else:  # PDF
+            filename = f"{report_type}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+            response = InventoryReportGenerator.export_as_pdf(data, filename, headers, title)
+        
+        # Email report if requested
+        if email_report and email_recipients:
+            try:
+                # Save file temporarily for emailing
+                temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=f'.{export_format}')
+                temp_file.write(response.get_data())
+                temp_file.close()
+                
+                # Send email
+                recipients = [email.strip() for email in email_recipients.split(',')]
+                email_service.send_report_email(recipients, title, temp_file.name)
+                
+                # Clean up temp file
+                os.unlink(temp_file.name)
+                
+                flash('Report generated and emailed successfully!', 'success')
+            except Exception as e:
+                flash(f'Report generated but email failed: {str(e)}', 'warning')
+        
+        return response
+        
+    except Exception as e:
+        flash(f'Error generating report: {str(e)}', 'danger')
+        return redirect(url_for('reports_dashboard'))
+
+@app.route('/api/send-low-stock-alert', methods=['POST'])
+@login_required
+def send_low_stock_alert():
+    """API endpoint to send low stock alert"""
+    if not has_permission('analytics.view'):
+        return jsonify({'success': False, 'message': 'Permission denied'}), 403
+    
+    try:
+        success = email_service.send_low_stock_alert()
+        if success:
+            return jsonify({'success': True, 'message': 'Low stock alert sent successfully'})
+        else:
+            return jsonify({'success': False, 'message': 'Failed to send alert - check email configuration'})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
 
 @app.route('/inventory')
 @login_required
@@ -376,6 +634,71 @@ def edit_user(user_id):
         form.is_active.data = user.is_active
     
     return render_template('edit_user.html', title='Edit User', form=form, user=user, has_permission=has_permission)
+
+@app.route('/customers/<int:customer_id>/edit', methods=['GET', 'POST'])
+@login_required
+def edit_customer(customer_id):
+    """Edit customer"""
+    if not has_permission('customers.edit'):
+        abort(403)
+        
+    customer = Customer.query.get_or_404(customer_id)
+    form = CustomerForm()
+    
+    if form.validate_on_submit():
+        customer.first_name = form.first_name.data
+        customer.last_name = form.last_name.data
+        customer.company_name = form.company_name.data
+        customer.tax_id = form.tax_id.data
+        customer.email = form.email.data
+        customer.phone = form.phone.data
+        customer.website = form.website.data
+        customer.address = form.address.data
+        customer.city = form.city.data
+        customer.state = form.state.data
+        customer.zip_code = form.zip_code.data
+        customer.country = form.country.data
+        customer.customer_type = form.customer_type.data
+        customer.customer_category = form.customer_category.data
+        customer.industry = form.industry.data
+        customer.annual_revenue = form.annual_revenue.data
+        customer.employee_count = form.employee_count.data
+        customer.preferred_contact_method = form.preferred_contact_method.data
+        customer.credit_limit = form.credit_limit.data
+        customer.payment_terms = form.payment_terms.data
+        customer.notes = form.notes.data
+        customer.is_active = form.is_active.data
+        
+        db.session.commit()
+        flash('Customer has been updated!', 'success')
+        return redirect(url_for('customers'))
+    
+    elif request.method == 'GET':
+        # Populate form with existing data
+        form.first_name.data = customer.first_name
+        form.last_name.data = customer.last_name
+        form.company_name.data = customer.company_name
+        form.tax_id.data = customer.tax_id
+        form.email.data = customer.email
+        form.phone.data = customer.phone
+        form.website.data = customer.website
+        form.address.data = customer.address
+        form.city.data = customer.city
+        form.state.data = customer.state
+        form.zip_code.data = customer.zip_code
+        form.country.data = customer.country
+        form.customer_type.data = customer.customer_type
+        form.customer_category.data = customer.customer_category
+        form.industry.data = customer.industry
+        form.annual_revenue.data = customer.annual_revenue
+        form.employee_count.data = customer.employee_count
+        form.preferred_contact_method.data = customer.preferred_contact_method
+        form.credit_limit.data = customer.credit_limit
+        form.payment_terms.data = customer.payment_terms
+        form.notes.data = customer.notes
+        form.is_active.data = customer.is_active
+    
+    return render_template('edit_customer.html', title='Edit Customer', form=form, customer=customer, has_permission=has_permission)
 
 @app.route('/users/<int:user_id>/delete', methods=['POST'])
 @login_required
@@ -768,7 +1091,9 @@ def init_db():
         ('inventory.edit', 'Edit Inventory'),
         ('customers.view', 'View Customers'),
         ('customers.edit', 'Edit Customers'),
-        ('operations.basic', 'Perform Basic Operations')
+        ('operations.basic', 'Perform Basic Operations'),
+        ('reports.view', 'View Reports'),
+        ('reports.generate', 'Generate Reports')
     ]
     
     for name, description in permissions_data:
@@ -784,7 +1109,9 @@ def init_db():
         ('projects.edit', 'Edit Projects'),
         ('projects.delete', 'Delete Projects'),
         ('sales.view', 'View Sales'),
-        ('sales.edit', 'Edit Sales')
+        ('sales.edit', 'Edit Sales'),
+        ('reports.view', 'View Reports'),
+        ('reports.generate', 'Generate Reports')
     ]
     
     for name, description in new_permissions:
@@ -838,6 +1165,8 @@ def init_db():
     projects_delete = Permission.query.filter_by(name='projects.delete').first()
     sales_view = Permission.query.filter_by(name='sales.view').first()
     sales_edit = Permission.query.filter_by(name='sales.edit').first()
+    reports_view = Permission.query.filter_by(name='reports.view').first()
+    reports_generate = Permission.query.filter_by(name='reports.generate').first()
     
     # Admin gets all permissions
     admin_role.permissions = all_permissions
@@ -854,7 +1183,9 @@ def init_db():
         projects_view,
         projects_edit,
         sales_view,
-        sales_edit
+        sales_edit,
+        reports_view,
+        reports_generate
     ]
     
     # Operator gets basic operation permissions
@@ -864,7 +1195,8 @@ def init_db():
         inventory_view, 
         customers_view,
         projects_view,
-        sales_view
+        sales_view,
+        reports_view
     ]
     
     # Viewer gets view-only permissions
@@ -874,7 +1206,8 @@ def init_db():
         customers_view,
         analytics_view,
         projects_view,
-        sales_view
+        sales_view,
+        reports_view
     ]
     
     db.session.commit()

@@ -1,0 +1,189 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="fade-in">
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <h1 class="text-gradient">
+                <i class="fas fa-chart-bar me-2"></i>
+                {{ title }}
+            </h1>
+            <p class="text-muted">Configure and generate your report</p>
+        </div>
+        <div class="col-md-4 text-end">
+            <a href="{{ url_for('reports_dashboard') }}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left me-1"></i>
+                Back to Reports
+            </a>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-8 mx-auto">
+            <div class="card">
+                <div class="card-header">
+                    <i class="fas fa-cog me-2"></i>
+                    Report Configuration
+                </div>
+                <div class="card-body">
+                    <form method="POST">
+                        {{ form.hidden_tag() }}
+                        
+                        <!-- Date Range -->
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                {{ form.start_date.label(class="form-label") }}
+                                {{ form.start_date(class="form-control", type="date") }}
+                                {% if form.start_date.errors %}
+                                    <div class="text-danger small mt-1">
+                                        {% for error in form.start_date.errors %}
+                                            <div>{{ error }}</div>
+                                        {% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-6">
+                                {{ form.end_date.label(class="form-label") }}
+                                {{ form.end_date(class="form-control", type="date") }}
+                                {% if form.end_date.errors %}
+                                    <div class="text-danger small mt-1">
+                                        {% for error in form.end_date.errors %}
+                                            <div>{{ error }}</div>
+                                        {% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        
+                        <!-- Export Format -->
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                {{ form.export_format.label(class="form-label") }}
+                                {{ form.export_format(class="form-select") }}
+                            </div>
+                        </div>
+                        
+                        <!-- Filters -->
+                        <div class="card mb-3">
+                            <div class="card-header">
+                                <i class="fas fa-filter me-2"></i>
+                                Filters (Optional)
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    {% if report_type in ['inventory_status', 'low_stock', 'stock_movement', 'inventory_valuation', 'inventory_aging', 'cost_analysis', 'reorder_suggestions'] %}
+                                    <div class="col-md-6 mb-3">
+                                        {{ form.category_id.label(class="form-label") }}
+                                        {{ form.category_id(class="form-select") }}
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        {{ form.supplier_id.label(class="form-label") }}
+                                        {{ form.supplier_id(class="form-select") }}
+                                    </div>
+                                    {% endif %}
+                                    
+                                    {% if report_type in ['sales_history', 'customer_sales'] %}
+                                    <div class="col-md-6 mb-3">
+                                        {{ form.customer_id.label(class="form-label") }}
+                                        {{ form.customer_id(class="form-select") }}
+                                    </div>
+                                    {% endif %}
+                                    
+                                    {% if report_type in ['product_performance'] %}
+                                    <div class="col-md-6 mb-3">
+                                        {{ form.product_id.label(class="form-label") }}
+                                        {{ form.product_id(class="form-select") }}
+                                    </div>
+                                    {% endif %}
+                                    
+                                    {% if report_type in ['user_activity'] %}
+                                    <div class="col-md-6 mb-3">
+                                        {{ form.user_id.label(class="form-label") }}
+                                        {{ form.user_id(class="form-select") }}
+                                    </div>
+                                    {% endif %}
+                                </div>
+                                
+                                {% if report_type in ['inventory_status', 'inventory_valuation'] %}
+                                <div class="form-check mb-3">
+                                    {{ form.include_inactive(class="form-check-input") }}
+                                    {{ form.include_inactive.label(class="form-check-label") }}
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        
+                        <!-- Email Options -->
+                        <div class="card mb-3">
+                            <div class="card-header">
+                                <i class="fas fa-envelope me-2"></i>
+                                Email Options
+                            </div>
+                            <div class="card-body">
+                                <div class="form-check mb-3">
+                                    {{ form.email_report(class="form-check-input", id="emailReportCheck") }}
+                                    {{ form.email_report.label(class="form-check-label") }}
+                                </div>
+                                
+                                <div id="emailRecipientsDiv" style="display: none;">
+                                    {{ form.email_recipients.label(class="form-label") }}
+                                    {{ form.email_recipients(class="form-control", placeholder="email1@example.com, email2@example.com") }}
+                                    <div class="form-text">{{ form.email_recipients.description }}</div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="d-flex justify-content-between">
+                            <a href="{{ url_for('reports_dashboard') }}" class="btn btn-outline-secondary">
+                                <i class="fas fa-arrow-left me-1"></i>
+                                Cancel
+                            </a>
+                            {{ form.submit(class="btn btn-primary") }}
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const emailCheck = document.getElementById('emailReportCheck');
+    const emailDiv = document.getElementById('emailRecipientsDiv');
+    
+    emailCheck.addEventListener('change', function() {
+        if (this.checked) {
+            emailDiv.style.display = 'block';
+        } else {
+            emailDiv.style.display = 'none';
+        }
+    });
+    
+    // Set quick date ranges
+    const today = new Date();
+    const startDateInput = document.querySelector('input[name="start_date"]');
+    const endDateInput = document.querySelector('input[name="end_date"]');
+    
+    // Add quick date buttons
+    const dateRangeButtons = `
+        <div class="btn-group mb-3" role="group">
+            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="setDateRange(7)">Last 7 Days</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="setDateRange(30)">Last 30 Days</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="setDateRange(90)">Last 90 Days</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="setDateRange(365)">Last Year</button>
+        </div>
+    `;
+    
+    startDateInput.parentNode.parentNode.insertAdjacentHTML('beforebegin', dateRangeButtons);
+});
+
+function setDateRange(days) {
+    const today = new Date();
+    const startDate = new Date(today.getTime() - (days * 24 * 60 * 60 * 1000));
+    
+    document.querySelector('input[name="start_date"]').value = startDate.toISOString().split('T')[0];
+    document.querySelector('input[name="end_date"]').value = today.toISOString().split('T')[0];
+}
+</script>
+{% endblock %}
