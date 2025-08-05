@@ -1,7 +1,8 @@
 from flask import Flask, render_template, redirect, url_for, flash, request, abort
 from flask_login import LoginManager, UserMixin, login_user, current_user, logout_user, login_required
 from flask_bcrypt import Bcrypt
-from datetime import datetime
+from sqlalchemy import and_
+from datetime import datetime, timedelta
 import os
 import urllib
 from dotenv import load_dotenv
